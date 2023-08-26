@@ -25,40 +25,45 @@ Using
     - [Christian Lempa's tutorial here](`traefik`) as referred by [u/admecoach's post](https://www.reddit.com/r/Traefik/comments/13fjlsk/recommended_setup_for_traefik_using_cloudflare/)
 
 ## Current Status
-Immich and Traefik containers are running.
+Immich and Traefik containers are running, accessble from the local network.
+External access isn't configured correctly.
 
 Configuration Files:
 - [traefik docker-compose](traefik_docker_compose.yml)
 - [immich docker-compose](immich_docker_compose.yml)
 - [immich .env](immich.env)
 
-Unraid Docker Dashboard
+Unraid Docker Dashboard  
 ![unraid_docker_page.png](unraid_docker_page.png)
 
-Traefik seems to be running, and is forwarding requests sent to host `photos.codyduncan.net` towards `immich_proxy`.
+Traefik is running, and appears to be forwarding requests sent to host `photos.codyduncan.net` towards `immich_proxy`.
 
-Traefik Dashboard
+Traefik Dashboard  
 ![traefik_dashboard.png](traefik_dashboard.png)
 
-When using IMAGE: `nginx:latest` for `immich_proxy`  
-Visiting `photos.codyduncan.net` shows the nginx welcome page.
+When using `image: nginx:latest` for `immich_proxy`  
+Visiting `photos.codyduncan.net` shows the nginx welcome page.  
 ![navigate_to_address_shows_nginx_welcome.png](navigate_to_address_shows_nginx_welcome.png)
 
-When using IMAGE: `ghcr.io/immich-app/immich_proxy:${IMMICH_VERSION:-release}` for `immich_proxy`  
-Visiting `photos.codyduncan.net` shows `bad gateway`.
+When using `image: ghcr.io/immich-app/immich_proxy:${IMMICH_VERSION:-release}` for `immich_proxy`  
+Visiting `photos.codyduncan.net` shows `bad gateway`.  
 ![navigate_to_address_shows_bad_gateway.png](navigate_to_address_shows_bad_gateway.png)
 
-Visiting `192.168.1.104:2283` shows the immich welcome screen.
+Visiting `192.168.1.104:2283` shows the immich welcome screen.  
 ![immich_welcome_at_port_2283.png](immich_welcome_at_port_2283.png)
 
-Visiting `192.168.16.9:8080`, which I think is the frontend to immich_proxy, says `The connection has timed out`.
+Visiting `192.168.16.9:8080`, which I think is the frontend to immich_proxy, says `The connection has timed out`.  
 ![immich_frontend_address_times_out.png](immich_frontend_address_times_out.png)
 
 
 ## Problems
 
 - `http://photos.codyduncan.net/` show the welcome page. The https version `https://photos.codyduncan.net/` shows `404 page not found`. How do I configure routing for https?
-- `immich_proxy` is an nginx instance. How do I configure `traefik` to point at `immich_proxy`, and `immich_proxy` to point at immich, so that `https://photos.codyduncan.net/` shows the immich server? (Is `immich_proxy` already pointing at `immich_web`?)
+- `immich_proxy` is an nginx instance. How do I configure `traefik` to point at `immich_proxy`, and `immich_proxy` to point at `immich`, so that `https://photos.codyduncan.net/` shows the immich website?  
+(Is `immich_proxy` already pointing at `immich_web`?)
+
+## Questions
+- The unraid docker page's column reads `Port Mappings (App to Host)`. Entries look like `192.168.16.9:8080/TCP <-> 192.168.1.104:2283`. Which direction is this going? Is this saying that traffic towards (right-side) Host `192.168.1.104:2283` is sent to (left-side) App `192.168.16.9:8080/TCP`, or the other way around? Bidirectional?
 
 # Any Help and Guidance is Appreciated!
 
