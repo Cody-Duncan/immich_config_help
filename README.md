@@ -64,6 +64,7 @@ Visiting `192.168.16.9:8080`, which I think is the frontend to immich_proxy, say
 
 ## Questions
 - The unraid docker page's column reads `Port Mappings (App to Host)`. Entries look like `192.168.16.9:8080/TCP <-> 192.168.1.104:2283`. Which direction is this going? Is this saying that traffic towards (right-side) Host `192.168.1.104:2283` is sent to (left-side) App `192.168.16.9:8080/TCP`, or the other way around? Bidirectional?
+- Where is the nginx.conf for immich_proxy on unraid? What directory path?
 
 # Any Help and Guidance is Appreciated!
 
