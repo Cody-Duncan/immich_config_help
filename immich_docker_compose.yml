@@ -1,0 +1,121 @@
+# This file is based on https://github.com/immich-app/immich/blob/main/docker/docker-compose.yml
+# `# *` specifies significant changed configurations. Everything else comes from the above base file.
+version: "3.8"
+
+# * added an external network
+# `docker create network traefik_net` via unraid's terminal
+# traefik sends incoming requests through here
+networks:
+  traefik_net:
+    external: true
+
+services:
+  immich-server:
+    container_name: immich_server
+    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
+    command: [ "start.sh", "immich" ]
+    volumes:
+      - ${UPLOAD_LOCATION}:/usr/src/app/upload
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - database
+      - typesense
+    restart: always
+
+  immich-microservices:
+    container_name: immich_microservices
+    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
+    # extends:
+    #   file: hwaccel.yml
+    #   service: hwaccel
+    command: [ "start.sh", "microservices" ]
+    volumes:
+      - ${UPLOAD_LOCATION}:/usr/src/app/upload
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - database
+      - typesense
+    restart: always
+
+  immich-machine-learning:
+    container_name: immich_machine_learning
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
+    volumes:
+      - model-cache:/cache
+    env_file:
+      - .env
+    restart: always
+
+  immich-web:
+    container_name: immich_web
+    image: ghcr.io/immich-app/immich-web:${IMMICH_VERSION:-release}
+    env_file:
+      - .env
+    restart: always
+
+  typesense:
+    container_name: immich_typesense
+    image: typesense/typesense:0.24.1@sha256:9bcff2b829f12074426ca044b56160ca9d777a0c488303469143dd9f8259d4dd
+    environment:
+      - TYPESENSE_API_KEY=${TYPESENSE_API_KEY}
+      - TYPESENSE_DATA_DIR=/data
+      # remove this to get debug messages
+      - GLOG_minloglevel=1
+    volumes:
+      - tsdata:/data
+    restart: always
+
+  redis:
+    container_name: immich_redis
+    image: redis:6.2-alpine@sha256:70a7a5b641117670beae0d80658430853896b5ef269ccf00d1827427e3263fa3
+    restart: always
+
+  database:
+    container_name: immich_postgres
+    image: postgres:14-alpine@sha256:28407a9961e76f2d285dc6991e8e48893503cc3836a4755bbc2d40bcc272a441
+    env_file:
+      - .env
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_DB: ${DB_DATABASE_NAME}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: always
+
+  immich-proxy:
+    container_name: immich_proxy
+    image: ghcr.io/immich-app/immich-proxy:${IMMICH_VERSION:-release}
+    environment:
+      # Make sure these values get passed through from the env file
+      - IMMICH_SERVER_URL                                                        #  I never set these up. Should I?
+      - IMMICH_WEB_URL                                                           #  I never set these up. Should I?
+    ports:
+      - 2283:8080
+      - 2284:443                                                                 # * forward https traffic
+    depends_on:
+      - immich-server
+      - immich-web
+    restart: always
+    networks:
+      - default                                                                  # * set traefik to communicate on the immich_default network for internal traffic
+      - traefik_net                                                              # * set traefik to communicate on the traefik_net network for incoming web requests from traefik
+    labels:
+      # * Borrowed these settings from https://www.reddit.com/r/selfhosted/comments/vhzep9/comment/imof04q/?utm_source=share&utm_medium=web2x&context=3
+      #   specifically https://privatebin.devol.it/?3e024aa038588fc4#HmuFFDjK4e3Htu3Juu9AHwq8hQYNpbwf1LVe8jMdKEcM
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik_net"                                     # * Defines a default docker network to use for connections to all containers.
+      - "traefik.http.routers.immich.entrypoints=web"                            # * the entrypoint, i.e. port, to listen on.
+      #                                          ^ should be websecure?
+      - "traefik.http.routers.immich.rule=Host(`photos.codyduncan.net`)"         # * Rule for routing to immich-proxy. In this case, the rule is that the request was sent to `photos.codyduncan.net`
+      - "traefik.http.services.immich-proxy.loadbalancer.server.port=80"         # * specify which port Traefik should use for communication. Necessary if a contianer exposes multiple ports
+      #                                                              ^ should be 443?
+  
+volumes:
+  pgdata:
+  model-cache:
+  tsdata:

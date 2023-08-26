@@ -1,0 +1,54 @@
+# This file is based on https://doc.traefik.io/traefik/user-guides/docker-compose/acme-dns/
+# `# *` specifies significant changed configurations. Everything else comes from the above base file.
+version: "3.3"
+
+# * added an external network
+# `docker create network traefik_net` via unraid's terminal
+networks:
+  traefik_net:
+    external: true
+
+services:
+  traefik:
+    # The official v2 Traefik docker image
+    image: traefik:v2.10
+    container_name: "traefik"
+    command: 
+    - "--log.level=DEBUG"
+    - "--api.insecure=true"
+    - "--log.filePath=/logs/traefik.log"
+    - "--providers.docker=true"
+    - "--providers.docker.exposedbydefault=false"
+    - "--entrypoints.web.address=:80"
+    - "--entrypoints.websecure.address=:443"
+    - "--certificatesresolvers.myresolver.acme.dnschallenge=true"
+    - "--certificatesresolvers.myresolver.acme.dnschallenge.provider=cloudflare"
+    - "--certificatesresolvers.myresolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory" # testing
+    #- "--certificatesresolvers.myresolver.acme.caserver=https://acme-v02.api.letsencrypt.org/directory"        # production
+    - "--certificatesresolvers.myresolver.acme.email=<MY_EMAIL_FOR_CLOUDFLARE>"                                 # * Email for cloudflare's dns challenge.
+    - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    environment:
+      - "CF_API_EMAIL=<MY_EMAIL_FOR_CLOUDFLARE>"      # * Email for cloudflare's dns challenge.
+      - "CF_API_KEY=<MY_SECRET_API_KEY>"              # * API Key for cloudflare's dns challenge.
+    volumes:
+    # For unraid, just about every directory should be sent to /mnt/user/appdata/, so it's visible from file browsing.
+    # Otherwise, they're stuffed into the docker system image file and hard to access.
+      - "/mnt/user/appdata/traefik/letsencrypt:/letsencrypt" # * put these in appdata so I can see them in the file browser and delete them if needed.
+      - "/mnt/user/appdata/traefik/logs:/logs"               # * need this in appdata to read the logs
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    networks:
+      - traefik_net                                   # * set traefik to proxy external web requests into the traefik_net network 
+      
+  # whoami:
+  #   image: "traefik/whoami"
+  #   container_name: "whoami-service"
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.http.routers.whoami.rule=Host(`photos.codyduncan.net`)"
+  #     - "traefik.http.routers.whoami.entrypoints=websecure"
+  #     - "traefik.http.routers.whoami.tls.certresolver=myresolver"
+      
