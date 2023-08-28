@@ -92,28 +92,31 @@ services:
     image: ghcr.io/immich-app/immich-proxy:${IMMICH_VERSION:-release}
     environment:
       # Make sure these values get passed through from the env file
-      - IMMICH_SERVER_URL                                                        #  I never set these up. Should I?
-      - IMMICH_WEB_URL                                                           #  I never set these up. Should I?
+      - IMMICH_SERVER_URL                                                        #  I never set these up. Not sure they're needed.
+      - IMMICH_WEB_URL                                                           #  I never set these up. Not sure they're needed.
     ports:
-      - 2283:8080
-      - 2284:443                                                                 # * forward https traffic
+      - 2283:8080                                                                # Map port 2283 in the container <-> 8080 on the docker host
+      - 2284:443                                                                 # May not be needed (Map port 2284 in the container -> 8080 on the docker host)
     depends_on:
       - immich-server
       - immich-web
     restart: always
     networks:
-      - default                                                                  # * set traefik to communicate on the immich_default network for internal traffic
+      - default                                                                  # * set traefik to communicate on the immich_default network for internal traffic (immich_ is emplaced in front because it's not defined in this config's root level `networks` block)
       - traefik_net                                                              # * set traefik to communicate on the traefik_net network for incoming web requests from traefik
     labels:
       # * Borrowed these settings from https://www.reddit.com/r/selfhosted/comments/vhzep9/comment/imof04q/?utm_source=share&utm_medium=web2x&context=3
       #   specifically https://privatebin.devol.it/?3e024aa038588fc4#HmuFFDjK4e3Htu3Juu9AHwq8hQYNpbwf1LVe8jMdKEcM
-      - "traefik.enable=true"
-      - "traefik.docker.network=traefik_net"                                     # * Defines a default docker network to use for connections to all containers.
-      - "traefik.http.routers.immich.entrypoints=web"                            # * the entrypoint, i.e. port, to listen on.
-      #                                          ^ should be websecure?
-      - "traefik.http.routers.immich.rule=Host(`photos.codyduncan.net`)"         # * Rule for routing to immich-proxy. In this case, the rule is that the request was sent to `photos.codyduncan.net`
-      - "traefik.http.services.immich-proxy.loadbalancer.server.port=80"         # * specify which port Traefik should use for communication. Necessary if a contianer exposes multiple ports
-      #                                                              ^ should be 443?
+      - "traefik.enable=true"                                                     # * required in order for traefik to see `immich_proxy` and talk to it.
+      - "traefik.docker.network=traefik_net"                                      # might be redundant to `networks: - traefik_net`. Defines a default docker network to use for connections to all containers. 
+      - "traefik.http.routers.immich_proxy.entrypoints=websecure"                 # * for `immich_proxy` to receive, traefik only listens for incoming requests on the HTTPS entrypoint
+      - "traefik.http.routers.immich_proxy.tls.certresolver=myresolver"           # * resolve ssl certificates using the `myresolver` set up by traefik config's `certificatesresolvers.myresolver`
+      - "traefik.http.routers.immich_proxy.rule=Host(`photos.codyduncan.net`)"    # * for `immich_proxy` to receive, only take requests for `photos.codyduncan.net` 
+      - "traefik.http.services.immich_proxy.loadbalancer.server.port=8080"        # * traefik should send requests to port 8080 on the docker host. (in `ports:` this is redirected to 2283, which is the main entrypoint from the immich docs, https://documentation.immich.app/docs/developer/setup#instructions)
+      # Redirect https://photos.codyduncan.net/public to a publicly shared gallery with a really long url.
+      - "traefik.http.routers.immich_proxy.middlewares=publicshare-redirectregex"
+      - "traefik.http.middlewares.publicshare-redirectregex.redirectregex.regex=^https://photos.codyduncan.net/public"
+      - "traefik.http.middlewares.publicshare-redirectregex.redirectregex.replacement=https://photos.codyduncan.net/share/znTs0C-Nla8GS4rQ2NMFCW1R1IkPEAGNr2NJn942iuPru310VLPrQMrQpTp52Imlec4"
   
 volumes:
   pgdata:

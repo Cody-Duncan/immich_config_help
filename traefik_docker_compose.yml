@@ -14,31 +14,56 @@ services:
     image: traefik:v2.10
     container_name: "traefik"
     command: 
-    - "--log.level=DEBUG"
-    - "--api.insecure=true"
-    - "--log.filePath=/logs/traefik.log"
-    - "--providers.docker=true"
-    - "--providers.docker.exposedbydefault=false"
-    - "--entrypoints.web.address=:80"
+    - "--log.level=DEBUG"                                                                                       # `DEBUG` for troubleshooting, `WARN` for unstable production, `FATAL` for stable production
+    #- "--api.insecure=true"                                                                                    # DO NOT enable `insecure` in production. This puts an unsecured dashboard on port 8080.
+    - "--api.dashboard=true"                                                                                    # Enable the dashboard
+    - "--api=true"                                                                                              # Enable the API for the dashboard
+    - "--log.filePath=/logs/traefik.log"                                                                        # write logs for troubleshooting
+    - "--accesslog.filepath=/logs/access.log"                                                                   # write logs for http requests made to the server
+    - "--providers.docker.network=traefik_net"                                                                  # ? I do not know if this is redundant to `networks: - traefik_net`
+    - "--providers.docker=true"                                                                                 # * required when using docker (docs don't say why)
+    - "--providers.docker.exposedbydefault=false"                                                               # If set to false, containers that do not have a `traefik.enable=true` label are ignored from the resulting routing configuration. (https://doc.traefik.io/traefik/providers/docker/#exposedbydefault)
+    #- "--entrypoints.web.address=:80"                                                                          # *** Do not expose the HTTP entrypoint
     - "--entrypoints.websecure.address=:443"
-    - "--certificatesresolvers.myresolver.acme.dnschallenge=true"
-    - "--certificatesresolvers.myresolver.acme.dnschallenge.provider=cloudflare"
+    - "--certificatesresolvers.myresolver.acme.email=<MY_EMAIL_FOR_CLOUDFLARE>"
+    - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
     - "--certificatesresolvers.myresolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory" # testing
     #- "--certificatesresolvers.myresolver.acme.caserver=https://acme-v02.api.letsencrypt.org/directory"        # production
-    - "--certificatesresolvers.myresolver.acme.email=<MY_EMAIL_FOR_CLOUDFLARE>"                                 # * Email for cloudflare's dns challenge.
-    - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+    - "--certificatesresolvers.myresolver.acme.dnschallenge=true"
+    - "--certificatesresolvers.myresolver.acme.dnschallenge.provider=cloudflare"
+    labels:
+    # HTTPS only
+      - "traefik.http.middlewares.httpsonly.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.httpsonly.redirectscheme.permanent=true"
+      - "traefik.http.routers.httpsonly.rule=HostRegexp(`{any:.*}`)"                                            # redirect *everything* to https
+      - "traefik.http.routers.httpsonly.middlewares=httpsonly"
+    #
+    #
+    # Note: need a DNS entry on the local router that redirects the host address, e.g. `tower.mynetwork`, to the Unraid Server.
+    #       Can fake this by adding an entry to the DNS table on your local machine (`c:\windows\system32\drivers\etc\hosts.file` on Windows); useful if the router doesn't support custom DNS entries.
+    #
+    # Dashboard
+      - "traefik.enable=true" # this is required for the dashboard to be included in the routing configuration, i.e. traefik is allowed to see and talk to itself to route to its own dashboard.
+      - "traefik.http.routers.dashboard.rule=Host(`tower.mynetwork`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))" # put the dashboard at tower.mynetwork/api or tower.mynetwork/dashboard
+      - "traefik.http.routers.dashboard.service=api@internal"                                                             # name of the internal service running the dashboard
+      - "traefik.http.routers.dashboard.middlewares=auth"                                                                 # Require a password to log into the dashboard
+      - "traefik.http.middlewares.auth.basicauth.users=admin:$$apr1$$t923deiq$$XShniVE0m7heYgWJw.J9A1"                    # HTPasswd required to log into the dashboard. Generated via https://www.web2generators.com/apache-tools/htpasswd-generator
+      - "traefik.http.routers.dashboard.tls=true"                                                                         # Enable SSL requests for the dashboard
+      - "traefik.http.routers.dashboard.tls.certresolver=myresolver"                                                      # Use the resolve setup from the commandline `certificatesresolvers.myresolver` 
+    # API
+      - "traefik.http.routers.api.tls=true"                                                                               # Enable SSL requests for the API used for the dashboard
+      - "traefik.http.routers.api.tls.certresolver=myresolver"                                                            # Use the resolve setup from the commandline `certificatesresolvers.myresolver` 
     ports:
-      - "80:80"
-      - "443:443"
-      - "8080:8080"
+      - "80:80"     # Map port 80 (HTTP) in the container -> 80 on the docker host
+      - "443:443"   # Map port 443 (HTTPS) in the container -> 443 on the docker host
     environment:
       - "CF_API_EMAIL=<MY_EMAIL_FOR_CLOUDFLARE>"      # * Email for cloudflare's dns challenge.
       - "CF_API_KEY=<MY_SECRET_API_KEY>"              # * API Key for cloudflare's dns challenge.
     volumes:
     # For unraid, just about every directory should be sent to /mnt/user/appdata/, so it's visible from file browsing.
     # Otherwise, they're stuffed into the docker system image file and hard to access.
-      - "/mnt/user/appdata/traefik/letsencrypt:/letsencrypt" # * put these in appdata so I can see them in the file browser and delete them if needed.
-      - "/mnt/user/appdata/traefik/logs:/logs"               # * need this in appdata to read the logs
+      - "/mnt/user/appdata/traefik/letsencrypt:/letsencrypt"  # * put these in appdata so I can see them in the file browser and delete them if needed.
+      - "/mnt/cache/appdata/traefik/logs:/logs"               # * need this in appdata to read the logs
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
     networks:
       - traefik_net                                   # * set traefik to proxy external web requests into the traefik_net network 
