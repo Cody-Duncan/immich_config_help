@@ -95,8 +95,8 @@ services:
       - IMMICH_SERVER_URL                                                        #  I never set these up. Not sure they're needed.
       - IMMICH_WEB_URL                                                           #  I never set these up. Not sure they're needed.
     ports:
-      - 2283:8080                                                                # Map port 2283 in the container <-> 8080 on the docker host
-      - 2284:443                                                                 # May not be needed (Map port 2284 in the container -> 8080 on the docker host)
+      - 2283:8080                                                                # Map port 2283 in the docker HOST <-> 8080 on the docker CONTAINER
+      - 2284:443                                                                 # May not be needed (Map port 2284 in the docker HOST -> 8080 on the docker CONTAINER)
     depends_on:
       - immich-server
       - immich-web

@@ -54,8 +54,8 @@ services:
       - "traefik.http.routers.api.tls=true"                                                                               # Enable SSL requests for the API used for the dashboard
       - "traefik.http.routers.api.tls.certresolver=myresolver"                                                            # Use the resolve setup from the commandline `certificatesresolvers.myresolver` 
     ports:
-      - "80:80"     # Map port 80 (HTTP) in the container -> 80 on the docker host
-      - "443:443"   # Map port 443 (HTTPS) in the container -> 443 on the docker host
+      - "80:80"     # Map port 80 (HTTP) in the docker HOST -> 80 on the docker CONTAINER
+      - "443:443"   # Map port 443 (HTTPS) in the docker HOST -> 443 on the docker CONTAINER
     environment:
       - "CF_API_EMAIL=<MY_EMAIL_FOR_CLOUDFLARE>"      # * Email for cloudflare's dns challenge.
       - "CF_API_KEY=<MY_SECRET_API_KEY>"              # * API Key for cloudflare's dns challenge.
